@@ -63,7 +63,15 @@ export async function addToRegistered(userid : string, eventid : string, waiverI
         }
 
         await Event.updateOne({_id: eventid},{$addToSet: {registeredIds : userid} }).orFail();
-        await User.updateOne({_id:userid},{$addToSet: {eventsRegistered : {eventId: eventid, digitalWaiver: waiverId }}}).orFail();
+
+        // addToSet will automatically error check in the case the eventId is somehow already stored to the user
+        await User.updateOne(
+          { _id: userid},
+          { $addToSet: { eventsRegistered: { eventId: eventid, digitalWaiver: waiverId } } }
+        ).orFail().catch(async (err) => {
+          throw err;
+        });
+
 
         revalidateTag("events")
         return true

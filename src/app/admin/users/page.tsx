@@ -25,6 +25,7 @@ import { Schema } from "mongoose";
 import ViewGroups from "app/components/ViewGroups";
 import { useUsers } from "app/lib/swrfunctions";
 import "../../fonts/fonts.css";
+import { getUserDbData } from "app/lib/authentication";
 
 export interface EventInfo {
   eventId: Schema.Types.ObjectId;
@@ -45,7 +46,7 @@ export interface IUser {
   lastName: string;
   age: number;
   gender: string;
-  role: "user" | "supervisor" | "admin" | "guest";
+  role: "user" | "supervisor" | "admin" | "guest" | "super-admin";
   eventsRegistered: EventInfo[];
   eventsAttended: AttendedEventInfo[];
   groupId: Schema.Types.ObjectId | null;
@@ -66,8 +67,8 @@ const formatHours = (hours: number): string => {
   return `${displayHours}h ${displayMinutes}min`;
 };
 
-const capitalizeFirstLetter = (str: string): string => {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+const editRoleName = (str: string): string => {
+  return str === "super-admin" ? "Super Admin" : str.charAt(0).toUpperCase() + str.slice(1);
 };
 
 const UserList = () => {
@@ -76,12 +77,15 @@ const UserList = () => {
   const [filteredUsers, setFilteredUsers] = useState<IUserWithHours[]>([]);
   const {users, isLoading, isError} = useUsers()
   const [searchTerm, setSearchTerm] = useState("");
+  const [adminData, setAdminData] = useState<IUser>();
   const [sortOrder, setSortOrder] = useState<{ value: string; label: string }>({
     value: "firstName",
     label: "First Name",
   });
   const [loading, setLoading] = useState(true);
   const tableSize = useBreakpointValue({ base: "sm", md: "md" });
+  const [page, setPage] = useState(0);
+  const userLimit = 15;
 
   // calculate hours for each event in user schema
   const calculateTotalHours = (events: AttendedEventInfo[]): number => {
@@ -143,6 +147,23 @@ const UserList = () => {
   };
 
   useEffect(() => {
+    getAdminData();
+
+  }, []);
+
+  const getAdminData = async () => {
+    try {
+      const userRes = await getUserDbData();
+      if (userRes) {
+        const userData = JSON.parse(userRes);
+        setAdminData(userData);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  }
+
+  useEffect(() => {
     if (isLoading || isError){
             return;
         }
@@ -181,7 +202,11 @@ const UserList = () => {
     lastName: user.lastName,
     email: user.email,
     phoneNumber: user.phoneNumber,
-    role: capitalizeFirstLetter(user.role),
+    zipcode: user.zipcode,
+    receivesNewsletter: user.receiveNewsletter ? "Yes" : "No",
+    age: user.age !== undefined ? user.age : "Unknown",
+    gender: user.gender || "Unknown",
+    role: editRoleName(user.role),
     eventsAttended:
       user.eventsAttendedNames.length > 0
         ? user.eventsAttendedNames.join(", ")
@@ -195,6 +220,10 @@ const UserList = () => {
     { label: "Last Name", key: "lastName" },
     { label: "Email", key: "email" },
     { label: "Phone Number", key: "phoneNumber" },
+    { label: "Zipcode", key: "zipcode"},
+    { label: "Receives Newsletter", key: "receivesNewsletter"},
+    { label: "Age", key: "age"},
+    { label: "Gender", key: "gender"},
     { label: "Role", key: "role" },
     { label: "Events Attended", key: "eventsAttended" },
     { label: "Number of Events Attended", key: "eventsAttendedCount" },
@@ -319,16 +348,16 @@ const UserList = () => {
                     </Td>
                     </Tr>
                 ) : (
-                    filteredUsers.map((user) => (
+                    filteredUsers.slice(page * userLimit, (page+1) * userLimit).map((user) => (
                     
                     <Tr key={user._id}>
                         <Td>{`${user.firstName} ${user.lastName}`}</Td>
                         <Td>{user.email}</Td>
                         <Td>{user.totalHoursFormatted}</Td>
   
-                        <Td>{capitalizeFirstLetter(user.role)}</Td>
+                        <Td>{editRoleName(user.role)}</Td>
                         <Td>
-                        <SingleVisitorComponent visitorData={user} removeFunction={removeUser} />
+                        <SingleVisitorComponent visitorData={user} removeFunction={removeUser} adminData={adminData}/>
                         </Td>
                     </Tr>
                     ))
@@ -336,6 +365,27 @@ const UserList = () => {
               </Tbody>
             </Table>
           </Box>
+          <div className={style.pageCountContainer}>
+            <Button 
+              className={style.pageButton}
+              isDisabled={page === 0}
+              onClick={() => setPage(page-1)}>
+                Previous
+            </Button>
+            <Text
+              fontSize={['xl', 'xl', '2xl']}
+              fontWeight="light"
+              color="black"
+            >
+              Page {page+1}
+            </Text>
+            <Button
+              className={style.pageButton}
+              isDisabled={(page+1) * userLimit >= filteredUsers.length} 
+              onClick={() => setPage(page+1)}>
+                Next
+            </Button>
+          </div>
       </div>
     </div>
   );

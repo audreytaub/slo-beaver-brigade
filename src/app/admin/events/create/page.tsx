@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box,
   Button,
@@ -19,16 +19,17 @@ import {
   Flex,
   Stack,
   Textarea,
+  SimpleGrid,
   IconButton,
 } from "@chakra-ui/react";
-import { AddIcon, ChevronDownIcon } from "@chakra-ui/icons";
+import { AddIcon, CheckIcon, ChevronDownIcon, EditIcon } from "@chakra-ui/icons";
+import EventPreviewComponent from "@components/EventCard";
 import MiniCalendar from "../../../components/calendar/MiniCalendar";
 import { format, formatISO, parse } from "date-fns";
 import { useRouter } from "next/navigation";
 import { uploadFileS3Bucket } from "app/lib/clientActions";
 import { Select, CreatableSelect } from "chakra-react-select";
 import MDEditor from "@uiw/react-md-editor";
-import style from "@styles/calendar/calendar.module.css";
 import ImageSelector from "app/components/ImageSelector";
 import { useEventsAscending, useGroups } from "app/lib/swrfunctions";
 import { CreateTemporaryGroup } from "app/components/ViewGroups";
@@ -36,6 +37,7 @@ import { IGroup } from "database/groupSchema";
 import { IEvent } from "database/eventSchema";
 import { IEventTemplate } from "database/eventTemplateSchema";
 // import { IEvent } from "database/eventTemplateSchema";
+import style from "./create.module.css";
 import "../../../fonts/fonts.css";
 import { set } from "mongoose";
 
@@ -52,46 +54,12 @@ export default function Page() {
   const router = useRouter();
   const [eventName, setEventName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<IEventTemplate | null>(null);
-  const [templates, setTemplates] = useState<IEventTemplate[]>([
-    {
-      _id: "1",
-      eventName: "Volunteer Meetup",
-      eventImage: null,
-      eventType: "Volunteer",
-      location: "Central Park",
-      description: "Community service event.",
-      checklist: "Bring gloves, trash bags",
-      groupsOnly: false,
-      wheelchairAccessible: true,
-      spanishSpeakingAccommodation: false,
-      startTime: new Date(),
-      endTime: new Date(),
-      volunteerEvent: true,
-      groupsAllowed: [],
-      registeredIds: [],
-    },
-    {
-      _id: "2",
-      eventName: "Charity Drive",
-      eventImage: null,
-      eventType: "Fundraiser",
-      location: "Community Hall",
-      description: "Fundraiser for local charities.",
-      checklist: "Bring donations",
-      groupsOnly: false,
-      wheelchairAccessible: true,
-      spanishSpeakingAccommodation: true,
-      startTime: new Date(),
-      endTime: new Date(),
-      volunteerEvent: false,
-      groupsAllowed: ["789"],
-      registeredIds: [],
-    },
-  ]);
+  const [templates, setTemplates] = useState<IEventTemplate[]>([]);
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [eventType, setEventType] = useState("");
   const [eventTypes, setEventTypes] = useState<string[]>([]);
+  const [isVolunteerEvent, setIsVolunteerEvent] = useState(false);
   const [organizationIds, setOrganizationIds] = useState<string[]>([]);
   const [groupsSelected, setGroupsSelected] = useState<IGroup[]>([]);
   const { groups, isLoading, isError, mutateGroups } = useGroups();
@@ -110,33 +78,36 @@ export default function Page() {
     useState("");
   const [onlyGroups, setOnlyGroups] = useState<boolean>(false);
   const [description, setDescription] = useState("");
-  const [checkList, setChecklist] = useState("N/A");
+  const [checkList, setChecklist] = useState<string[]>([]);
   const [activeDate, setActiveDate] = useState("");
   const [eventStart, setEventStart] = useState("");
   const [eventEnd, setEventEnd] = useState("");
   const [passedEndTime, setPassedEndTime] = useState("");
   const [passedStartTime, setPassedStartTime] = useState("");
   const [sendEmailInvitees, setSendEmailInvitees] = useState<boolean>(false);
+  const [items, setItems] = useState<string[]>([]); // list of items
+  const [newItem, setNewItem] = useState(''); // item user is currently adding
+  const [editingIndex, setEditingIndex] = useState(null); // track which item is being edited
+  const [editValue, setEditValue] = useState(''); // store the new value during editing
 
   const handleEventNameChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setEventName(e.target.value);
 
   const handleOrganizationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const groupId = e.target.value;
-    const isChekced = e.target.checked;
+    const isChecked = e.target.checked;
 
     setOrganizationIds((prevIds: string[]) => {
-      if (isChekced) {
-        //add to list
+      if (isChecked) {
         return [...prevIds, groupId];
       } else {
-        //remove from list
-        return prevIds.filter((id) => id != groupId);
+        return prevIds.filter((id) => id !== groupId);
       }
     });
   };
 
-  //Parse and format start and end time from user input
+
+
   const handleTimeChange = (start: string, end: string) => {
     // Format for parsing input times (handle both 12-hour and 24-hour formats)
     if (start && end) {
@@ -148,18 +119,18 @@ export default function Page() {
       const parsedStartTime = parse(
         `${start}`,
         timeFormat,
-        new Date(`${activeDate? activeDate : format(new Date(), "yyyy-MM-dd")}T00:00:00`)
+        new Date(`${activeDate ? activeDate : format(new Date(), "yyyy-MM-dd")}T00:00:00`)
       );
       const parsedEndTime = parse(
         `${end}`,
         timeFormat,
-        new Date(`${activeDate? activeDate : format(new Date(), "yyyy-MM-dd")}T00:00:00`)
+        new Date(`${activeDate ? activeDate : format(new Date(), "yyyy-MM-dd")}T00:00:00`)
       );
 
       // Format the adjusted dates back into ISO strings
       const formattedStartDateTime = formatISO(parsedStartTime);
       const formattedEndDateTime = formatISO(parsedEndTime);
-      // Update the state with the formatted date times
+
       setEventStart(formattedStartDateTime);
       setEventEnd(formattedEndDateTime);
     }
@@ -170,15 +141,13 @@ export default function Page() {
       setEventEnd("");
     }
   };
-  // Update active date upon change from MiniCalendar
+
   const handleDateChangeFromCalendar = (newDate: string) => {
     setActiveDate(newDate);
   };
 
-  // Create a ref for the file input
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Function to trigger file input click for image upload
   const promptFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -192,7 +161,7 @@ export default function Page() {
     setEventType(template.eventType || "");
     setLocation(template.location);
     setDescription(template.description || "");
-    setChecklist(template.checklist || "");
+    setChecklist(template.checklist || []);
     setOnlyGroups(template.groupsOnly || false);
     setAccessibilityAccommodation(template.wheelchairAccessible ? "Yes" : "No");
     setSpanishSpeaking(template.spanishSpeakingAccommodation ? "Yes" : "No");
@@ -200,13 +169,13 @@ export default function Page() {
     setEventEnd(formatISO(template.endTime));
     setPassedStartTime(format(template.startTime, 'HH:mm'));
     setPassedEndTime(format(template.endTime, 'HH:mm'));
-  
+
     setEventTypes((prev) =>
       template.eventType && !prev.includes(template.eventType)
         ? [...prev, template.eventType]
         : prev
-    );    
-  
+    );
+
     setGroupsSelected(
       template.groupsAllowed.map(id => ({
         _id: id,
@@ -214,22 +183,21 @@ export default function Page() {
         groupees: [],
       }))
     );
-  
-    setChecklist(template.checklist || "");
-  
+
+    setChecklist(template.checklist || []);
+
     setEventType(template.eventType || "");
-  
+
     // setLocation(template.location);
     setLocation((prev) => (template.location && prev !== template.location ? template.location : prev));
-  
+
     if (template.eventImage) {
       setImagePreview(template.eventImage);
-    }    
-  };  
-  
+    }
+  };
+
   const handleSaveAsTemplate = async () => {
-    const newTemplate: IEventTemplate = {
-      _id: (templates.length + 1).toString(),
+    const newTemplateData = {
       eventName,
       eventImage: imagePreview,
       eventType,
@@ -245,16 +213,60 @@ export default function Page() {
       groupsAllowed: groupsSelected.map(group => group._id),
       registeredIds: [],
     };
+
+    let response;
+    console.log("Selected Template ID:", selectedTemplate?._id);
+    console.log("Templates Array:", templates);
+    if (templates.some(template => template.eventName === eventName)) {
+      response = await fetch(`/api/eventtemplate/${selectedTemplate?._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newTemplateData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const updatedTemplate: IEventTemplate = await response.json();
+      setTemplates((prevTemplates) =>
+        prevTemplates.map((template) =>
+          template._id === updatedTemplate._id ? updatedTemplate : template
+        )
+      );
+      
+      toast({
+        title: "Template Updated",
+        description: "This event template has been updated.",
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+    } else {
+      response = await fetch("/api/eventtemplate/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newTemplateData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const newTemplate: IEventTemplate = await response.json();
+      setTemplates([...templates, newTemplate]);
   
-    setTemplates([...templates, newTemplate]);
-  
-    toast({
-      title: "Template Saved",
-      description: "This event has been saved as a template.",
-      status: "success",
-      duration: 2500,
-      isClosable: true,
-    });
+      toast({
+        title: "Template Saved",
+        description: "This event has been saved as a template.",
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+
   };  
 
   // Handle file selection for the event cover image and set preview
@@ -275,15 +287,7 @@ export default function Page() {
 
   // Throw a Toast when event details are not complete and makes a post request to create event if details are complete
   const handleCreateEvent = async () => {
-    debugger;
-    // Form validation before submission
-    if (
-      !eventName ||
-      !eventType ||
-      !accessibilityAccommodation ||
-      !location ||
-      !description
-    ) {
+    if (!eventName || !eventType || !accessibilityAccommodation || !location || !description) {
       toast({
         title: "Error",
         description: "Event details are not complete",
@@ -312,10 +316,9 @@ export default function Page() {
       return;
     }
 
-    // Try to upload image
     const file = fileInputRef?.current?.files?.[0] ?? null;
     let imageurl = null;
-
+    
     if (file || preselected) {
       if (!preselected) {
         imageurl = await uploadFileS3Bucket(file);
@@ -346,12 +349,11 @@ export default function Page() {
       spanishSpeakingAccommodation: spanishSpeaking === "Yes",
       startTime: eventStart,
       endTime: eventEnd,
-      volunteerEvent: eventType === "Volunteer",
+      volunteerEvent: isVolunteerEvent,
       groupsAllowed: groupsSelected.map((group) => group._id as string),
       groupsOnly: onlyGroups,
     };
 
-    // Attempt to create event via API and handle response
     try {
       const response = await fetch("/api/events", {
         method: "POST",
@@ -362,7 +364,7 @@ export default function Page() {
       });
 
       if (!response.ok) {
-        throw new Error("HTTP error! status: $(response.status)");
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const event: IEvent = await response.json();
@@ -415,9 +417,8 @@ export default function Page() {
       groupees: [],
     };
 
-    // Optimistically update UI
     const optimisticNewGroup = {
-      _id: Date.now().toString(), // Temporary ID
+      _id: Date.now().toString(),
       group_name: groupName,
     };
 
@@ -430,19 +431,15 @@ export default function Page() {
         body: JSON.stringify(groupData),
       });
       if (!response.ok) {
-        // Rollback if the creation failed
         setGroups((currentGroups) =>
           currentGroups.filter((group) => group._id !== optimisticNewGroup._id)
         );
         throw new Error("Failed to create group");
       }
       const newGroup = await response.json();
-      // Update the temporary group with actual _id from the response
       setGroups((currentGroups) =>
         currentGroups.map((group) =>
-          group._id === optimisticNewGroup._id
-            ? { ...group, _id: newGroup._id }
-            : group
+          group._id === optimisticNewGroup._id ? { ...group, _id: newGroup._id } : group
         )
       );
       toast({
@@ -463,7 +460,6 @@ export default function Page() {
     }
   };
 
-  // Fetch groups data on component mount
   useEffect(() => {
     if (isError) {
       toast({
@@ -476,7 +472,6 @@ export default function Page() {
     }
   }, [isError]);
 
-  // Fetching different event types
   useEffect(() => {
     const fetchEventTypes = async () => {
       try {
@@ -489,74 +484,178 @@ export default function Page() {
       } catch (error) {
         console.error("Error fetching event types:", error);
       }
+
+    };
+
+    const fetchEventTemplates = async ()  => {
+
+      const response = await fetch("/api/eventtemplate/", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const templates = await response.json();
+  
+      setTemplates(templates);
+  
     };
 
     fetchEventTypes();
+    fetchEventTemplates();
   }, []);
 
-  return (
-    <Box p={[0, 8, 8, 8]} mx="10">
-      <Flex justifyContent="space-between" alignItems="center" mb={4}>
-    <Text fontSize="2xl" fontWeight="bold" color="black" mt={-12} mb={3}>
-      Create New Event
-    </Text>
-    <Menu>
-      <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
-        {selectedTemplate ? selectedTemplate.eventName : "Select Template"}
-      </MenuButton>
-      <MenuList>
-        {templates.map((template) => (
-          <MenuItem key={template._id} onClick={() => handleSelectTemplate(template)}>
-            {template.eventName}
-          </MenuItem>
-        ))}
-      </MenuList>
-    </Menu>
-  </Flex>
+  // add item currently being written out
+  const handleAddItem = () => {
+    if (newItem.trim()) {
+      setItems([...items, newItem]);
+      setChecklist([...checkList, newItem]);
+      setNewItem('');
+    }
+  };
 
-      {/* image uploading */}
-      <Flex
-        flexDir={{ base: "column", md: "row" }}
-        flex="1"
-        gap={{ base: "10px", md: "50px" }}
+  // remove item from list
+  const handleRemoveItem = (itemToRemove: string) => {
+    setItems(items.filter(item => item !== itemToRemove));
+    setChecklist(checkList.filter(item => item !== itemToRemove));
+  };
+
+  // edit item
+  const handleEditItem = (index: any, value: string) => {
+    setEditingIndex(index);
+    setEditValue(value);
+  };
+
+  const handleSaveEdit = (index: any) => {
+    if (editValue.trim()) {
+      const updatedItems = [...items];
+      updatedItems[index] = editValue;
+      setItems(updatedItems);
+    }
+    setEditingIndex(null);
+  };
+
+  // hitting enter auto adds item
+  const handleKeyPress = (e: { key: string; }) => {
+    if (e.key === 'Enter') {
+      handleAddItem();
+    }
+  };
+
+  const mockEvent = {
+    _id: "mockId",
+    eventName,
+    eventImage: imagePreview,
+    eventType,
+    checklist: checkList,
+    location,
+    description,
+    wheelchairAccessible: accessibilityAccommodation === "Yes",
+    spanishSpeakingAccommodation: spanishSpeaking === "Yes",
+    startTime: eventStart ? new Date(eventStart) : new Date(),
+    endTime: eventEnd ? new Date(eventEnd) : new Date(),
+    volunteerEvent: eventType === "Volunteer",
+    groupsAllowed: organizationIds,
+    registeredIds: [],
+    attendeeIds: [],
+  };
+
+  return (
+    <Box px="1%" pb="8" mx="4%">
+      <Box
+        justifyContent="space-between"
+        alignItems="center"
+        display="flex"
+        flexDirection="row"
       >
-        <FormControl mb="4" onClick={promptFileInput} cursor="pointer">
-          <Input
-            id="cover-image"
-            type="file"
-            accept="image/*"
-            // value={eventImage}
-            onChange={handleImageChange}
-            ref={fileInputRef}
-            hidden // Hide the actual input
-          />
-          <Box
-            position="relative"
-            borderWidth="1px"
-            p="4"
-            mt="4"
-            textAlign="center"
-            h="64"
-            borderRadius="20px"
-            overflow="hidden"
-            width="100%"
-            bg="gray.200"
-            display="flex"
+        <Text
+          fontSize="2xl"
+          fontWeight="bold"
+          color="black"
+        >
+          Create New Event
+        </Text>
+        <Menu>
+          <MenuButton as={Button} rightIcon={<ChevronDownIcon />} minWidth={'180px'} >
+            Select Template
+          </MenuButton>
+          <MenuList>
+            {templates.map((template) => (
+              <MenuItem
+                key={template._id}
+                onClick={() => handleSelectTemplate(template)}
+              >
+                {template.eventName}
+              </MenuItem>
+            ))}
+          </MenuList>
+        </Menu>
+      </Box>
+
+      <HStack width="100%">
+        <Flex
+          flexDir={{ base: "column", lg: "row" }}
+          flex="1"
+          gap={{ base: "10px", lg: "30px" }}
+          justifyContent="center"
+          alignItems="center"
+        >
+          <Box mt="4">
+            <EventPreviewComponent
+              event={mockEvent}
+              groupName={
+              groups?.find((group) => group._id === organizationIds[0])?.group_name || ""
+              }
+              onClick={() => {}}
+            />
+          </Box>
+            <Flex 
+            flex="1"
+            gap={{ base: "10px", lg: "30px" }}
             justifyContent="center"
             alignItems="center"
-            flexDirection="column"
-          >
-            {!imagePreview ? (
-              <>
+            width="100%">
+            <FormControl onClick={promptFileInput} cursor="pointer" width="100%">
+              <Input
+              id="cover-image"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              ref={fileInputRef}
+              hidden // Hide the actual input
+              />
+              <Box
+              position="relative"
+              borderWidth="1px"
+              p="4"
+              mt="4"
+              textAlign="center"
+              h="64"
+              borderRadius="20px"
+              overflow="hidden"
+              width="100%"
+              bg="gray.200"
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              flexDirection="column"
+              >
+              {!imagePreview ? (
+                <>
                 <Text>Upload Image</Text>
                 <IconButton
                   aria-label="Upload image"
                   icon={<AddIcon />}
                   mt="2"
                 />
-              </>
-            ) : (
-              <Image
+                </>
+              ) : (
+                <Image
                 src={imagePreview}
                 alt="Event cover preview"
                 position="absolute"
@@ -566,18 +665,20 @@ export default function Page() {
                 height="100%"
                 objectFit="cover"
                 zIndex={0}
-              />
-            )}
-          </Box>
-        </FormControl>
-        <ImageSelector
-          setPreselected={setPreselected}
-          setImageURL={setImagePreview}
-        ></ImageSelector>
-      </Flex>
+                />
+              )}
+              </Box>
+            </FormControl>
+            <ImageSelector
+              setPreselected={setPreselected}
+              setImageURL={setImagePreview}
+            ></ImageSelector>
+            </Flex>
+        </Flex>
+      </HStack>
 
-      <Flex direction={{ base: "column", md: "row" }} gap={20} mb={6} mt={6}>
-        <VStack spacing={4} align="stretch" flex="1">
+      <Flex direction={{ base: "column", xl: "row" }} gap={{base: 10, 'xl': 12}} mb={6} mt={6}>
+        <VStack spacing={4} align="stretch" flex="1" maxWidth={{ base: "100%", 'xl': "45%" }}>
           <FormControl isRequired>
             <FormLabel htmlFor="event-name" fontWeight="bold">
               Event Name
@@ -589,67 +690,6 @@ export default function Page() {
               onChange={handleEventNameChange}
             />
           </FormControl>
-
-          <HStack justifyContent="space-between">
-            <FormControl width="48%">
-              <FormLabel htmlFor="event-type" fontWeight="bold">
-                Event Type
-              </FormLabel>
-              <CreatableSelect
-                id="event-type"
-                placeholder="Select or create event type"
-                options={eventTypes.map((type) => ({
-                  value: type,
-                  label: type,
-                }))}
-                value={eventType ? { value: eventType, label: eventType } : null}
-                onChange={(option) => setEventType(option ? option.value : "")}
-                chakraStyles={{
-                  control: (provided) => ({
-                    ...provided,
-                    textAlign: "left",
-                  }),
-                }}
-                isClearable
-                isSearchable
-              />
-            </FormControl>
-
-            <FormControl width="48%">
-              <FormLabel htmlFor="organization" fontWeight="bold">
-                Assign Groups
-              </FormLabel>
-              <CreatableSelect
-                id="organization"
-                placeholder="Select or create organization"
-                options={groups?.map((group) => ({
-                  value: group._id,
-                  label: group.group_name,
-                }))}
-                value={groupsSelected.map((group) => ({
-                  value: group._id,
-                  label: group.group_name,
-                }))}
-                onChange={(selectedOptions) =>
-                  setGroupsSelected(
-                    selectedOptions
-                      ? selectedOptions.map((option) => ({ _id: option.value, group_name: option.label, groupees: [] }))
-                      : []
-                  )
-                }
-                onCreateOption={handleCreateNewGroup}
-                chakraStyles={{
-                  control: (provided) => ({
-                    ...provided,
-                    textAlign: "left",
-                  }),
-                }}
-                isMulti
-                isClearable
-                isSearchable
-              />
-            </FormControl>
-          </HStack>
 
           <FormControl isRequired>
             <FormLabel htmlFor="location" fontWeight="bold">
@@ -663,108 +703,239 @@ export default function Page() {
             />
           </FormControl>
 
-          <FormControl>
-            <FormLabel htmlFor="spanishAccommodation" fontWeight="bold">
-              Spanish Speaking Accommodation
-            </FormLabel>
-            <Select
-              id="accommodation-type"
-              // value={}
-              placeholder="Select an Option"
-              options={[
+          <div className={style.twoThirdsGrid}>
+            {/* Row 1: Event Type and Volunteer Hours */}
+            <div className={style.leftColumn}>
+              <FormControl isRequired>
+                  <FormLabel
+                  htmlFor="event-type"
+                  fontWeight="bold"
+                  >
+                  Event Type
+                  </FormLabel>
+                <CreatableSelect
+                  id="event-type"
+                  placeholder="Select or create event type"
+                  options={eventTypes.map((type) => ({
+                    value: type,
+                    label: type,
+                  }))}
+                  value={eventType ? { value: eventType, label: eventType } : null}
+                  onChange={(option) => setEventType(option ? option.value : "")}
+                  chakraStyles={{
+                    control: (provided) => ({
+                      ...provided,
+                      textAlign: "left",
+                    }),
+                  }}
+                  isClearable
+                  isSearchable
+                />
+              </FormControl>
+            </div>
+
+            <div className={style.rightColumn}> 
+              <FormControl>
+                <FormLabel htmlFor="volunteer-hours" fontWeight="bold">
+                  Volunteer Hours
+                </FormLabel>
+                <Select
+                  id="volunteer-hours"
+                  placeholder="Select an Option"
+                  options={[
+                    { value: "Yes", label: "Yes" },
+                    { value: "No", label: "No" },
+                  ]}
+                  value={
+                    isVolunteerEvent
+                      ? { value: "Yes", label: "Yes" }
+                      : { value: "No", label: "No" }
+                  }
+                  onChange={(option) =>
+                    setIsVolunteerEvent(option ? option.value === "Yes" : false)
+                  }
+                  chakraStyles={{
+                    control: (provided) => ({
+                      ...provided,
+                      textAlign: "left",
+                    }),
+                  }}
+                />
+              </FormControl>
+            </div>
+          </div>
+
+            {/* Row 2: Assign Groups and Only Available to Selected Groups */}
+            <div>
+              <FormControl>
+              <FormLabel htmlFor="organization" fontWeight="bold">
+                Assign Groups
+              </FormLabel>
+              <CreatableSelect
+                id="organization"
+                placeholder="Select or create organization"
+                options={groups?.map((group) => ({
+                value: group._id,
+                label: group.group_name,
+                }))}
+                value={groupsSelected.map((group) => ({
+                value: group._id,
+                label: group.group_name,
+                }))}
+                onChange={(selectedOptions) =>
+                setGroupsSelected(
+                  selectedOptions
+                  ? selectedOptions.map((option) => ({
+                    _id: option.value,
+                    group_name: option.label,
+                    groupees: [],
+                    }))
+                  : []
+                )
+                }
+                onCreateOption={handleCreateNewGroup}
+                chakraStyles={{
+                control: (provided) => ({
+                  ...provided,
+                  textAlign: "left",
+                }),
+                }}
+                isMulti
+                isClearable
+                isSearchable
+              />
+              </FormControl>
+            </div>
+
+          <div className={style.halfGrid}>
+          <div className={style.halfLeftColumn}>
+              <FormControl>
+                <FormLabel htmlFor="invitees" fontWeight="bold">
+                  Groups Only
+                </FormLabel>
+                <Select
+                  id="invitees"
+                  placeholder="Select an Option"
+                  options={[
+                    { value: "Yes", label: "Yes" },
+                    { value: "No", label: "No" },
+                  ]}
+                  value={
+                    onlyGroups
+                      ? { value: "Yes", label: "Yes" }
+                      : { value: "No", label: "No" }
+                  }
+                  onChange={(option) =>
+                    setOnlyGroups(option ? option.value === "Yes" : false)
+                  }
+                  chakraStyles={{
+                    control: (provided) => ({
+                      ...provided,
+                      textAlign: "left",
+                    }),
+                  }}
+                />
+              </FormControl>
+            </div>
+
+            <div className={style.halfRightColumn}>
+              <FormControl>
+                <FormLabel htmlFor="invitees" fontWeight="bold">
+                  Notify Group Members
+                </FormLabel>
+                <Select
+                  id="invitees"
+                  placeholder="Select an Option"
+                  options={[
+                    { value: "Yes", label: "Yes" },
+                    { value: "No", label: "No" },
+                  ]}
+                  value={
+                    sendEmailInvitees
+                      ? { value: "Yes", label: "Yes" }
+                      : { value: "No", label: "No" }
+                  }
+                  onChange={(option) =>
+                    setSendEmailInvitees(option ? option.value === "Yes" : false)
+                  }
+                  chakraStyles={{
+                    control: (provided) => ({
+                      ...provided,
+                      textAlign: "left",
+                    }),
+                  }}
+                />
+              </FormControl>
+            </div>
+          </div>
+            
+          <div className={style.halfGrid}>
+            {/* Row 3: Accommodations */}
+            <div className={style.halfLeftColumn}>
+              <FormControl isRequired>
+              <FormLabel htmlFor="spanishAccommodation" fontWeight="bold">
+                Spanish Speaking
+              </FormLabel>
+              <Select
+                id="accommodation-type"
+                placeholder="Select an Option"
+                options={[
                 { value: "Yes", label: "Yes" },
                 { value: "No", label: "No" },
-              ]}
-              value={
-                spanishSpeaking != ""
+                ]}
+                value={
+                spanishSpeaking !== ""
                   ? { value: spanishSpeaking, label: spanishSpeaking }
                   : null
-              }
-              onChange={(option) => setSpanishSpeaking(option ? option.value : "")}
-              chakraStyles={{
+                }
+                onChange={(option) =>
+                setSpanishSpeaking(option ? option.value : "")
+                }
+                chakraStyles={{
                 control: (provided) => ({
                   ...provided,
                   textAlign: "left",
                 }),
-              }}
-            ></Select>
-          </FormControl>
+                }}
+              />
+              </FormControl>
+            </div>
 
-          <FormControl>
-            <FormLabel htmlFor="accessibility" fontWeight="bold">
-              Accessibility Accommodation
-            </FormLabel>
-            <Select
-              id="accessibility"
-              placeholder="Select an Option"
-              options={[
+            <div className={style.halfRightColumn}>
+              <FormControl isRequired>
+              <FormLabel htmlFor="accessibility" fontWeight="bold">
+                Wheelchair Accessibile
+              </FormLabel>
+              <Select
+                id="accessibility"
+                placeholder="Select an Option"
+                options={[
                 { value: "Yes", label: "Yes" },
                 { value: "No", label: "No" },
-              ]}
-              value={
-                accessibilityAccommodation != ""
+                ]}
+                value={
+                accessibilityAccommodation !== ""
                   ? { value: accessibilityAccommodation, label: accessibilityAccommodation }
                   : null
-              }
-              onChange={(option) =>
+                }
+                onChange={(option) =>
                 setAccessibilityAccommodation(option ? option.value : "")
-              }
-              chakraStyles={{
+                }
+                chakraStyles={{
                 control: (provided) => ({
                   ...provided,
                   textAlign: "left",
                 }),
-              }}
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel htmlFor="invitees" fontWeight="bold">
-              Only Available to Selected Groups
-            </FormLabel>
-            <Select
-              id="invitees"
-              placeholder="Select an Option"
-              options={[
-                { value: "Yes", label: "Yes" },
-                { value: "No", label: "No" },
-              ]}
-              value={
-                onlyGroups
-                  ? { value: "Yes", label: "Yes" }
-                  : { value: "No", label: "No" }}
-              onChange={(option) =>
-                setOnlyGroups(option ? option.value == "Yes" : false)
-              }
-              chakraStyles={{
-                control: (provided) => ({
-                  ...provided,
-                  textAlign: "left",
-                }),
-              }}
-            />
-          </FormControl>
-          {onlyGroups && groups && (
-            <div className="flex sm:flex-row flex-col-reverse gap-5 sm:gap-10 sm:items-center ">
-              <CreateTemporaryGroup
-                groups={groupsSelected}
-                mutate={mutateGroups}
-                setGroups={setGroupsSelected}
+                }}
               />
-              <div className="flex flex-row gap-4 justify-center">
-                {" "}
-                Notify Group Individuals:{" "}
-                <Checkbox
-                  checked={sendEmailInvitees}
-                  onChange={() => setSendEmailInvitees((checked) => !checked)}
-                ></Checkbox>
-              </div>
+              </FormControl>
             </div>
-          )}
+          </div>
         </VStack>
-        <Flex flex="1">
+        
+        <Flex alignItems="center" justifyContent="center">
           <VStack alignItems="flex-start">
-            <Text fontWeight="bold"  mt={{ base: "-16", md: "0" }} mb="-4">
+            <Text fontWeight="bold" >
               Date/Time
             </Text>
             {/* MiniCalendar */}
@@ -782,11 +953,13 @@ export default function Page() {
 
       <Stack
         direction={{ base: "column", lg: "row" }}
-        spacing={4}
-        align="start"
+        spacing={6}
+        display={"flex"}
+        justifyContent="space-between"
+        align-items="center"
         w="100%"
       >
-        <FormControl isRequired flex={1}>
+        <FormControl isRequired flex={2}>
           <FormLabel htmlFor="description" fontWeight="bold">
             Description
           </FormLabel>
@@ -799,39 +972,85 @@ export default function Page() {
         </FormControl>
 
         <FormControl flex={1}>
-          <FormLabel htmlFor="required-items" fontWeight="bold">
-            Checklist
-          </FormLabel>
-          <MDEditor
-            className={style.preview}
-            value={checkList}
-            onChange={(e) => setChecklist(e || "")}
-            data-color-mode="light"
-          />
-        </FormControl>
+            <FormLabel htmlFor="required-items" fontWeight="bold">
+              Checklist
+            </FormLabel>
+            <VStack spacing={2} align="stretch" ml={0}>
+              {/* creates new field per item added */}
+              {items.length > 0 && (
+                <Box>
+                  <VStack spacing={2} align="stretch">
+                    {items.map((item, index) => (
+                      <HStack key={index} spacing={2} display={"flex"} justifyContent={"space-around"} w={"100%"}>
+                        {editingIndex === index ? (
+                          <Input
+                            size="sm"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(index)}
+                            autoFocus
+                          />
+                        ) : (
+                          <Box w={"100%"} textAlign="left">{item}</Box>
+                        )}
+
+                        <IconButton
+                          icon={editingIndex === index ? <CheckIcon /> : <EditIcon />}
+                          size="sm"
+                          colorScheme="yellow"
+                          onClick={() => editingIndex === index ? handleSaveEdit(index) : handleEditItem(index, item)}
+                          aria-label="Edit item"
+                        />
+
+                        <Button
+                          size="sm"
+                          colorScheme="red"
+                          onClick={() => handleRemoveItem(item)}
+                        >
+                          x
+                        </Button>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </Box>
+              )}
+              <HStack spacing={4} w="100%">
+                <Input
+                  id="new-item"
+                  value={newItem}
+                  onChange={(e) => setNewItem(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Enter item"
+                />
+                <Button onClick={handleAddItem} colorScheme="teal">
+                  +
+                </Button>
+              </HStack>
+            </VStack>
+          </FormControl>
       </Stack>
 
       <Box display="flex" justifyContent="center" mt={4} gap={4}>
+        <Button
+          bg="#48a0e0"
+          color="white"
+          _hover={{ bg: "#377ab8" }}
+          onClick={handleSaveAsTemplate}
+          minWidth="170px"
+        >
+          Save as Template
+        </Button>
         <Button
           loadingText="Creating"
           bg="#e0af48"
           color="black"
           _hover={{ bg: "#C19137" }}
           onClick={handleCreateEvent}
-          minWidth="150px"
+          minWidth="170px"
         >
           Create Event
-        </Button>
-        <Button
-          bg="#48a0e0"
-          color="white"
-          _hover={{ bg: "#377ab8" }}
-          onClick={handleSaveAsTemplate}
-          minWidth="150px"
-        >
-          Save as Template
         </Button>
       </Box>
     </Box>
   );
-}
+};
