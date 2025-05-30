@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import style from '@styles/admin/eventCard.module.css';
 import { IEvent } from '@database/eventSchema';
@@ -13,8 +13,8 @@ interface EventPreviewProps {
   onClick: () => void;
 }
 
- // convert date into xx:xx XM - xx:xx XM
- const formatDateTimeRange = (start: Date, end: Date) => {
+// convert date into xx:xx XM - xx:xx XM
+const formatDateTimeRange = (start: Date, end: Date) => {
   if (!(start instanceof Date)) {
     start = new Date(start); // Convert to Date object if not already
   }
@@ -24,16 +24,21 @@ interface EventPreviewProps {
   }
 
   const options: Intl.DateTimeFormatOptions = {
-    hour: "numeric", // "numeric" or "2-digit"
-    minute: "numeric", // "numeric" or "2-digit"
+    hour: 'numeric', // "numeric" or "2-digit"
+    minute: 'numeric', // "numeric" or "2-digit"
   };
 
-  const formattedStart = start.toLocaleTimeString("en-US", options);
-  const formattedEnd = end.toLocaleTimeString("en-US", options);
+  const formattedStart = start.toLocaleTimeString('en-US', options);
+  const formattedEnd = end.toLocaleTimeString('en-US', options);
 
+  // Check if the start and end times are in the same hour
+  // If they are, we can format them differently to save space on small windows
+  if (formattedStart[-2] === formattedEnd[-2]) {
+    return `${formattedStart.slice(0, -3)} - ${formattedEnd}`;
+  }
 
   return `${formattedStart} - ${formattedEnd}`;
- };
+};
 
 const EventCard: React.FC<EventPreviewProps> = ({
   event,
@@ -50,12 +55,19 @@ const EventCard: React.FC<EventPreviewProps> = ({
     }
   };
 
-  const initialImage = isValidUrl(event.eventImage) ? event.eventImage! : '/beaver-eventcard.jpeg';
-  const [imageSrc, setImageSrc] = useState<string>(initialImage);
+  const [imageSrc, setImageSrc] = useState<string>('/beaver-eventcard.jpeg');
 
   const handleImageError = () => {
     setImageSrc('/beaver-eventcard.jpeg');
   };
+
+  useEffect(() => {
+    if (!isValidUrl(event.eventImage)) {
+      setImageSrc('/beaver-eventcard.jpeg');
+    } else {
+      setImageSrc(event.eventImage!);
+    }
+  }, [event.eventImage]);
 
   const formatDate = (date: Date | string): string => {
     if (!date) return 'Invalid date';
@@ -113,25 +125,27 @@ const EventCard: React.FC<EventPreviewProps> = ({
         />
       </div>
       <div className={style.eventTitle}>
-        <h2>{event.eventName}</h2>
+        <h2 className={style.eventName}>{event.eventName}</h2>
       </div>
       <div className={style.bottomRow}>
         <div className={style.eventInfo}>
           <Flex className={style.eventDetails}>
-            <CalendarIcon mt={'5px'} />
-            <Text ml={'5px'}>{formatDate(event.startTime)}</Text>
+            <CalendarIcon mt={'2px'} />
+            <Text ml={'6px'}>{formatDate(event.startTime)}</Text>
           </Flex>
           <Flex className={style.eventDetails}>
-            <TimeIcon mt={'5px'} />
-            <Text ml={'5px'}>
+            <TimeIcon mt={'2px'} />
+            <Text ml={'6px'}>
               {formatDateTimeRange(event.startTime, event.endTime)}
             </Text>
           </Flex>
           <Flex className={style.eventDetails}>
-            <Box mt={'5px'}>
+            <Box mt={'2px'}>
               <PiMapPinFill />
             </Box>
-            <Text ml={'5px'}>{event.location}</Text>
+            <Text className={style.location} ml={'8px'}>
+              {event.location}
+            </Text>
           </Flex>
         </div>
         <div className={style.visitorCount}>

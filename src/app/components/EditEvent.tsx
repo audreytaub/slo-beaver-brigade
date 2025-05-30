@@ -148,6 +148,7 @@ const EditEvent = ({
       eventImage: imagePreview,
       location: loc,
       description: desc,
+      isOpen: event.isOpen,
       startTime: new Date(`${date}T${start}`),
       endTime: new Date(`${date}T${end}`),
       wheelchairAccessible: wc,
@@ -158,8 +159,6 @@ const EditEvent = ({
       registeredIds: event.registeredIds ? event.registeredIds : [],
       checklist: items,
     };
-
-    console.log("Event Data:", eventData);
 
     fetch(`/api/events/${event._id}/`, {
       method: "PATCH",

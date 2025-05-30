@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box,
   Button,
-  Checkbox,
   Menu,
   MenuButton,
   MenuList,
@@ -18,8 +17,6 @@ import {
   Text,
   Flex,
   Stack,
-  Textarea,
-  SimpleGrid,
   IconButton,
 } from "@chakra-ui/react";
 import { AddIcon, CheckIcon, ChevronDownIcon, EditIcon } from "@chakra-ui/icons";
@@ -32,14 +29,13 @@ import { Select, CreatableSelect } from "chakra-react-select";
 import MDEditor from "@uiw/react-md-editor";
 import ImageSelector from "app/components/ImageSelector";
 import { useEventsAscending, useGroups } from "app/lib/swrfunctions";
-import { CreateTemporaryGroup } from "app/components/ViewGroups";
+import ViewGroups from 'app/components/ViewGroups';
 import { IGroup } from "database/groupSchema";
 import { IEvent } from "database/eventSchema";
 import { IEventTemplate } from "database/eventTemplateSchema";
 // import { IEvent } from "database/eventTemplateSchema";
 import style from "./create.module.css";
 import "../../../fonts/fonts.css";
-import { set } from "mongoose";
 
 // Define a type for groups to resolve '_id' does not exist on type 'never'
 type Group = {
@@ -349,6 +345,7 @@ export default function Page() {
       spanishSpeakingAccommodation: spanishSpeaking === "Yes",
       startTime: eventStart,
       endTime: eventEnd,
+      isOpen: true,
       volunteerEvent: isVolunteerEvent,
       groupsAllowed: groupsSelected.map((group) => group._id as string),
       groupsOnly: onlyGroups,
@@ -553,8 +550,9 @@ export default function Page() {
     eventImage: imagePreview,
     eventType,
     checklist: checkList,
-    location,
+    location: location !== "" ? location : "TBD",
     description,
+    isOpen: true,
     wheelchairAccessible: accessibilityAccommodation === "Yes",
     spanishSpeakingAccommodation: spanishSpeaking === "Yes",
     startTime: eventStart ? new Date(eventStart) : new Date(),
@@ -766,45 +764,50 @@ export default function Page() {
           </div>
 
             {/* Row 2: Assign Groups and Only Available to Selected Groups */}
-            <div>
-              <FormControl>
-              <FormLabel htmlFor="organization" fontWeight="bold">
-                Assign Groups
-              </FormLabel>
-              <CreatableSelect
-                id="organization"
-                placeholder="Select or create organization"
-                options={groups?.map((group) => ({
-                value: group._id,
-                label: group.group_name,
-                }))}
-                value={groupsSelected.map((group) => ({
-                value: group._id,
-                label: group.group_name,
-                }))}
-                onChange={(selectedOptions) =>
-                setGroupsSelected(
-                  selectedOptions
-                  ? selectedOptions.map((option) => ({
-                    _id: option.value,
-                    group_name: option.label,
-                    groupees: [],
-                    }))
-                  : []
-                )
-                }
-                onCreateOption={handleCreateNewGroup}
-                chakraStyles={{
-                control: (provided) => ({
-                  ...provided,
-                  textAlign: "left",
-                }),
-                }}
-                isMulti
-                isClearable
-                isSearchable
-              />
-              </FormControl>
+            <div className={style.oneTenthGrid}>
+              <div className={style.leftTenths}>
+                <FormControl>
+                <FormLabel htmlFor="organization" fontWeight="bold">
+                  Assign Groups
+                </FormLabel>
+                <CreatableSelect
+                  id="organization"
+                  placeholder="Select or create organization"
+                  options={groups?.map((group) => ({
+                  value: group._id,
+                  label: group.group_name,
+                  }))}
+                  value={groupsSelected.map((group) => ({
+                  value: group._id,
+                  label: group.group_name,
+                  }))}
+                  onChange={(selectedOptions) =>
+                  setGroupsSelected(
+                    selectedOptions
+                    ? selectedOptions.map((option) => ({
+                      _id: option.value,
+                      group_name: option.label,
+                      groupees: [],
+                      }))
+                    : []
+                  )
+                  }
+                  onCreateOption={handleCreateNewGroup}
+                  chakraStyles={{
+                  control: (provided) => ({
+                    ...provided,
+                    textAlign: "left",
+                  }),
+                  }}
+                  isMulti
+                  isClearable
+                  isSearchable
+                />
+                </FormControl>
+              </div>
+              <div className={style.righthTenths}>
+                <ViewGroups/>
+              </div>
             </div>
 
           <div className={style.halfGrid}>

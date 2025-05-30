@@ -1,21 +1,8 @@
 'use client';
 
-import {
-  Box,
-  Spinner,
-  Checkbox,
-  useDisclosure,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Spinner, Checkbox, useDisclosure, Text } from '@chakra-ui/react';
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/admin/editEvent.module.css';
-import { IEvent } from '@database/eventSchema';
 import { IUser } from '@database/userSchema';
 import { ISignedWaiver } from 'database/signedWaiverSchema';
 import { IWaiverVersion } from '@database/waiverVersionsSchema';
@@ -51,6 +38,8 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
   const [selectedVisitors, setSelectedVisitors] = useState<IUser[]>([]);
   const [waivers, setWaivers] = useState<ISignedWaiver[]>([]);
   const [waiverVersions, setWaiverVersions] = useState<IWaiverVersion[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedVisitor, setSelectedVisitor] = useState<IUser | null>(null);
   const [selectedWaiver, setSelectedWaiver] = useState<ISignedWaiver | null>(
     null
   );
@@ -115,6 +104,7 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
       }
     }
     setShowAdminActions(false);
+    setLoading(true);
   };
 
   async function handleMarkSelectVisitors() {
@@ -123,6 +113,7 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
       await addAttendee(visitor._id.toString(), eventId.toString());
     }
     setShowAdminActions(false);
+    setLoading(true);
   }
 
   async function handleRemoveSelectedAttendees() {
@@ -157,6 +148,7 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
           eventId.toString()
         );
         setShowAdminActions(false);
+        setLoading(true);
       }
     }
   }
@@ -253,7 +245,7 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
       }
     };
     fetchVisitorData();
-  }, [isLoading]);
+  }, [isLoading, loading]);
 
   async function handleCheck(checked: boolean, visitor: IUser) {
     if (checked) {
@@ -359,6 +351,7 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
                     <th className={styles.nameColumn}>Name</th>
                     <th className={styles.emailColumn}>Email</th>
                     <th className={styles.detailsColumn}>Waiver Status</th>
+                    <th className={styles.detailsColumn}>Attendance</th>
                     <th className={styles.detailsColumn}>Details</th>
                   </tr>
                 </thead>
@@ -396,28 +389,58 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
                               {group.parent.email ? group.parent.email : 'N/A'}
                             </td>
                             <td className={styles.detailsColumn}>
-                                {waivers.some(
-                                  (w) => w.signeeId === group.parent._id
-                                ) ? (
-                                  <span
-                                    className={styles.link}
-                                    style={{
-                                      cursor: 'pointer',
-                                    }}
-                                    onClick={() => openWaiver(group.parent._id)}
-                                  >
-                                    Signed
-                                  </span>
-                                ) : (
-                                  <p>Unsigned</p>
-                                )}
+                              {waivers.some(
+                                (w) => w.signeeId === group.parent._id
+                              ) ? (
+                                <span
+                                  className={styles.link}
+                                  style={{
+                                    cursor: 'pointer',
+                                  }}
+                                  onClick={() => openWaiver(group.parent._id)}
+                                >
+                                  Signed
+                                </span>
+                              ) : (
+                                <p>Unsigned</p>
+                              )}
+                            </td>
+                            <td className={styles.nameColumn}>
+                              {group.parent.eventsAttended.some(
+                                (attended: any) => attended.eventId === eventId
+                              ) ? (
+                                <Text textAlign={'center'}>Checked In</Text>
+                              ) : (
+                                <Text textAlign={'center'}>Not Checked In</Text>
+                              )}
                             </td>
                             <td className={styles.detailsColumn}>
-                              <div className={styles.linkGroup}>
+                              <Text
+                                className={styles.link}
+                                onClick={() => {
+                                  setSelectedVisitor(group.parent);
+                                  setShowModal(true);
+                                }}
+                                cursor="pointer"
+                              >
+                                Details
+                              </Text>
+                              {selectedVisitor && (
                                 <SingleVisitorComponent
-                                  visitorData={group.parent}
+                                  visitorData={selectedVisitor}
+                                  removeFunction={(userId: string) => {
+                                    setSelectedVisitors((prev) =>
+                                      prev.filter(
+                                        (user) => user._id.toString() !== userId
+                                      )
+                                    );
+                                    setShowModal(false);
+                                  }}
+                                  adminData={undefined}
+                                  showModal={showModal}
+                                  setShowModal={setShowModal}
                                 />
-                              </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -452,16 +475,18 @@ const EditEventVisitorInfo = ({ eventId }: { eventId: string }) => {
           )}
         </>
       )}
-      <SingleVistorWaiver
-        isOpen={isWaiverModalOpen}
-        onClose={closeWaiverModal}
-        waiver={selectedWaiver}
-        waiverVersion={
-          waiverVersions?.find(
-            (v) => v.version === selectedWaiver?.waiverVersion
-          ) || null
-        }
-      />
+      {selectedWaiver && (
+        <SingleVistorWaiver
+          isOpen={isWaiverModalOpen}
+          onClose={closeWaiverModal}
+          waiver={selectedWaiver}
+          waiverVersion={
+            waiverVersions?.find(
+              (v) => v.version === selectedWaiver?.waiverVersion
+            ) || null
+          }
+        />
+      )}
     </Box>
   );
 };

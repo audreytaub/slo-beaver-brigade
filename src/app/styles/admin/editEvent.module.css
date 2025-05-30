@@ -35,6 +35,20 @@
   color: #337774;
 }
 
+.headerStopButton {
+  border: 2px solid #337774;
+  color: #337774;
+}
+
+.headerOpenButton {
+  background-color: #e0af48;
+  border: 2px solid black
+}
+
+.headerOpenButton:hover {
+  background-color: #C19137;
+}
+
 .saveButton {
   border: 2px solid #ffffff;
   color: #ffffff;
@@ -46,6 +60,11 @@
 }
 
 .backButton:hover {
+  background-color: #e6f7f6;
+  color: black;
+}
+
+.headerStopButton:hover {
   background-color: #e6f7f6;
   color: black;
 }
@@ -170,8 +189,13 @@
   cursor: pointer;
 }
 
+.visitorTable {
+  width: 100%;
+}
+
 .topBlock {
   display: flex;
+  flex-direction: row;
 }
 
 .leftBlock {
@@ -230,7 +254,7 @@
 .emailColumn {
   padding: 1.5% 3% 5% 3%;
   text-align: left;
-  width: 50%;
+  width: 45%;
   font-size: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -253,8 +277,8 @@
   height: auto;
   padding-top: 10px;
   padding-bottom: 10px;
-  max-width: 800px; 
-  margin: 0 auto;
+  font-size: 0.7rem;
+  width: 100%;
 }
 
 .boldText {
@@ -299,7 +323,6 @@
   width: 45%;
   height: 100%;
   font-size: 17px;
-  margin-left: 50px;
   text-align: right;
   display: flex;
   align-items: center;
@@ -350,6 +373,12 @@
   font-weight: bold;
 }
 
+.rightButtons {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
 .deleteButton {
   border: 2px solid #d93636;
   color: #d93636;
@@ -370,12 +399,6 @@
 .spinner {
   align-self: right;
   margin: 5px 10px 5px 10px;
-}
-
-.tableContainer {
-  font-size: 0.7rem;
-  margin-right:auto;
-  margin-left:0px;
 }
 
 .link {
@@ -414,6 +437,25 @@
 
   .tableContainer th, .tableContainer td {
     padding: 8px;
+  }
+}
+
+@media (max-width: 600px) {
+  .topBlock {
+    flex-direction: column;
+    padding: 0px 20px;
+  }
+  .bottomBlock {
+    padding: 0px 20px;
+  }
+  .header {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .rightButtons {
+    flex-direction: column;
+    gap: 10px;
   }
 }
 
